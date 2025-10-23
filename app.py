@@ -6,48 +6,127 @@ Crypto Playground Web Interface
 
 import os
 import sys
-import json
 import subprocess
-import asyncio
 from datetime import datetime
 from pathlib import Path
-from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for
+
+from flask import Flask, render_template, request, jsonify
+from werkzeug.utils import secure_filename
+
 # Убираем Socket.IO для упрощения
 import threading
 import time
 import requests
 import re
-from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Добавляем путь к crypto-playground
-sys.path.append('/workspace/crypto-playground')
+
+BASE_DIR = Path(__file__).resolve().parent
+
+# Определяем путь к исходному проекту crypto-playground
+_default_project_candidates = [
+    Path(os.environ.get('CRYPTO_PLAYGROUND_PATH', '/workspace/crypto-playground')),
+    BASE_DIR.parent / 'crypto-playground',
+    BASE_DIR,
+]
+
+for candidate in _default_project_candidates:
+    if candidate.exists():
+        CRYPTO_PLAYGROUND_PATH = str(candidate.resolve())
+        break
+else:
+    CRYPTO_PLAYGROUND_PATH = str(BASE_DIR)
+
+if CRYPTO_PLAYGROUND_PATH not in sys.path:
+    sys.path.append(CRYPTO_PLAYGROUND_PATH)
+
+# Общая директория для файлов проекта
+FILES_PATH = os.environ.get('CRYPTO_PLAYGROUND_FILES', os.path.join(CRYPTO_PLAYGROUND_PATH, 'files'))
+os.makedirs(FILES_PATH, exist_ok=True)
+
+# Поддиректории для аккаунтов и прокси
+ACCOUNTS_DIR = os.path.join(FILES_PATH, 'accounts')
+PROXIES_DIR = os.path.join(FILES_PATH, 'proxies')
+os.makedirs(ACCOUNTS_DIR, exist_ok=True)
+os.makedirs(PROXIES_DIR, exist_ok=True)
+
+ALLOWED_ACCOUNT_EXTENSIONS = {'.tsv', '.txt', '.csv'}
+
+
+def _normalize_account_filename(filename: str) -> str:
+    """Возвращает безопасное имя файла с допустимым расширением"""
+    if not filename:
+        raise ValueError('Имя файла не может быть пустым')
+
+    base_name = os.path.basename(filename).strip()
+    if not base_name:
+        raise ValueError('Имя файла не может быть пустым')
+
+    name, ext = os.path.splitext(base_name)
+    if not ext:
+        ext = '.tsv'
+
+    ext = ext.lower()
+    if ext not in ALLOWED_ACCOUNT_EXTENSIONS:
+        ext = '.tsv'
+
+    safe_name = secure_filename(f"{name}{ext}")
+    if not safe_name:
+        raise ValueError('Некорректное имя файла')
+
+    return safe_name
+
+
+def get_account_file_path(filename: str) -> str:
+    """Возвращает полный путь к файлу аккаунтов"""
+    safe_name = _normalize_account_filename(filename)
+    return os.path.join(ACCOUNTS_DIR, safe_name)
+
+
+def count_records_from_text(text: str) -> int:
+    """Подсчитывает количество непустых строк"""
+    return sum(1 for line in text.split('\n') if line.strip())
+
+
+def count_records_in_file(file_path: str, limit: int = 200000) -> int:
+    """Считает количество строк в файле с учетом лимита"""
+    count = 0
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as file_obj:
+            for index, line in enumerate(file_obj):
+                if line.strip():
+                    count += 1
+                if limit and index >= limit:
+                    break
+    except FileNotFoundError:
+        return 0
+    return count
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'crypto-playground-secret-key'
 
-# Пути к файлам
-CRYPTO_PLAYGROUND_PATH = '/workspace/crypto-playground'
-FILES_PATH = '/workspace/files'
-
 class ProcessManager:
     """Менеджер процессов для запуска команд crypto-playground"""
-    
+
     def __init__(self):
         self.processes = {}
         self.logs = {}
-    
+        self.metadata = {}
+        self.lock = threading.Lock()
+        self.max_logs = 1000
+
     def start_process(self, command_id, command, cwd=CRYPTO_PLAYGROUND_PATH):
         """Запуск процесса"""
         try:
             print(f"Starting process {command_id}: {command}")
             print(f"Working directory: {cwd}")
-            
+
             # Проверяем существование рабочей директории
             if not os.path.exists(cwd):
                 print(f"Working directory does not exist: {cwd}")
                 return False, f"Working directory does not exist: {cwd}"
-            
+
             process = subprocess.Popen(
                 command,
                 shell=True,
@@ -57,12 +136,23 @@ class ProcessManager:
                 universal_newlines=True,
                 bufsize=1
             )
-            
-            self.processes[command_id] = process
-            self.logs[command_id] = []
-            
+
+            with self.lock:
+                self.processes[command_id] = process
+                self.logs[command_id] = []
+                self.metadata[command_id] = {
+                    'command_id': command_id,
+                    'command': command,
+                    'cwd': os.path.abspath(cwd) if cwd else None,
+                    'status': 'running',
+                    'pid': process.pid,
+                    'started_at': datetime.utcnow().isoformat(),
+                    'finished_at': None,
+                    'exit_code': None,
+                }
+
             print(f"Process {command_id} started with PID: {process.pid}")
-            
+
             # Запускаем поток для чтения логов
             thread = threading.Thread(
                 target=self._read_output,
@@ -87,12 +177,17 @@ class ProcessManager:
                     break
                 if output:
                     log_entry = {
-                        'timestamp': datetime.now().isoformat(),
+                        'timestamp': datetime.utcnow().isoformat(),
                         'message': output.strip()
                     }
-                    self.logs[command_id].append(log_entry)
+                    with self.lock:
+                        logs = self.logs.setdefault(command_id, [])
+                        logs.append(log_entry)
+                        if len(logs) > self.max_logs:
+                            # Храним только последние записи, чтобы не расходовать память
+                            del logs[:-self.max_logs]
                     print(f"Log from {command_id}: {output.strip()}")
-                    
+
                     # Отправляем лог через WebSocket (отключено - используем HTTP polling)
                     # socketio.emit('log_update', {
                     #     'command_id': command_id,
@@ -100,36 +195,86 @@ class ProcessManager:
                     # })
         except Exception as e:
             print(f"Error reading output for {command_id}: {str(e)}")
-        
+
         # Процесс завершен
         exit_code = process.poll()
+        finished_at = datetime.utcnow().isoformat()
+        with self.lock:
+            meta = self.metadata.get(command_id)
+            if meta:
+                meta['exit_code'] = exit_code
+                meta['finished_at'] = finished_at
+                if meta.get('status') != 'stopped':
+                    meta['status'] = 'finished' if exit_code == 0 else 'failed'
+            # После завершения удаляем объект процесса, чтобы освободить ресурсы
+            self.processes.pop(command_id, None)
         print(f"Process {command_id} finished with exit code: {exit_code}")
         # socketio.emit('process_finished', {
         #     'command_id': command_id,
         #     'exit_code': exit_code
         # })
-    
+
     def stop_process(self, command_id):
         """Остановка процесса"""
-        if command_id in self.processes:
-            process = self.processes[command_id]
+        with self.lock:
+            process = self.processes.get(command_id)
+        if process:
             process.terminate()
+            with self.lock:
+                meta = self.metadata.get(command_id)
+                if meta:
+                    meta['status'] = 'stopped'
+                    meta['finished_at'] = datetime.utcnow().isoformat()
             return True
         return False
-    
+
     def get_process_status(self, command_id):
         """Получение статуса процесса"""
-        if command_id in self.processes:
-            process = self.processes[command_id]
-            if process.poll() is None:
+        with self.lock:
+            process = self.processes.get(command_id)
+            if process and process.poll() is None:
                 return 'running'
-            else:
-                return 'finished'
+            meta = self.metadata.get(command_id)
+        if meta:
+            return meta.get('status', 'finished')
         return 'not_found'
-    
+
     def get_logs(self, command_id):
         """Получение логов процесса"""
-        return self.logs.get(command_id, [])
+        with self.lock:
+            return list(self.logs.get(command_id, []))
+
+    def get_process_details(self, command_id):
+        """Возвращает метаданные и логи выбранного процесса"""
+        with self.lock:
+            meta = self.metadata.get(command_id)
+            if not meta:
+                return None
+            details = dict(meta)
+            details['logs'] = list(self.logs.get(command_id, []))
+        return details
+
+    def get_processes_summary(self):
+        """Сводная информация обо всех процессах"""
+        with self.lock:
+            summary = [dict(meta) for meta in self.metadata.values()]
+        summary.sort(key=lambda item: item.get('started_at') or '', reverse=True)
+        return summary
+
+    def clear_process(self, command_id):
+        """Удаляет информацию о процессе и его логах"""
+        removed = False
+        with self.lock:
+            process = self.processes.pop(command_id, None)
+            if process and process.poll() is None:
+                process.terminate()
+            if command_id in self.logs:
+                removed = True
+                self.logs.pop(command_id, None)
+            if command_id in self.metadata:
+                removed = True
+                self.metadata.pop(command_id, None)
+        return removed
 
 # Глобальные переменные для отслеживания прогресса (как в рабочем проекте)
 testing_progress = {
@@ -150,6 +295,7 @@ original_formats = {}
 # Глобальные переменные для хранения результатов
 current_working_proxies = []
 current_unique_proxies = []
+last_exported_filename = None
 
 def parse_proxy_format(proxy_string):
     """
@@ -227,20 +373,23 @@ def test_single_proxy(proxy, timeout=10):
 
 def run_proxy_test(proxy_list):
     """Запускает тестирование прокси в отдельном потоке с многопоточностью"""
-    global testing_progress, stop_testing, original_formats, current_working_proxies, current_unique_proxies
-    
+    global testing_progress, stop_testing, original_formats, current_working_proxies, current_unique_proxies, last_exported_filename
+
     print(f"Starting proxy testing with {len(proxy_list)} proxies")
-    
+
     testing_progress['is_running'] = True
     testing_progress['current'] = 0
     testing_progress['working'] = 0
     testing_progress['failed'] = 0
     testing_progress['unique_ips'] = 0
     stop_testing = False
-    
+    last_exported_filename = None
+
     # Парсим прокси в разных форматах
     proxies = []
     original_formats.clear()  # Очищаем предыдущие данные
+    current_working_proxies = []
+    current_unique_proxies = []
     for raw_proxy in proxy_list:
         standard_format, original_format = parse_proxy_format(raw_proxy)
         proxies.append(standard_format)
@@ -403,13 +552,203 @@ def api_file_content(filename):
         file_path = os.path.join(FILES_PATH, filename)
         if not os.path.exists(file_path):
             return jsonify({'error': 'File not found'}), 404
-        
+
         with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
-        
+
         return jsonify({'content': content})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/accounts/files')
+def api_accounts_files():
+    """Возвращает список файлов с аккаунтами"""
+    try:
+        files = []
+        if os.path.exists(ACCOUNTS_DIR):
+            for filename in sorted(os.listdir(ACCOUNTS_DIR)):
+                file_path = os.path.join(ACCOUNTS_DIR, filename)
+                if not os.path.isfile(file_path):
+                    continue
+                stat = os.stat(file_path)
+                files.append({
+                    'name': filename,
+                    'size': stat.st_size,
+                    'modified': datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                    'records': count_records_in_file(file_path)
+                })
+        return jsonify({'files': files})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/accounts/files', methods=['POST'])
+def api_accounts_create_file():
+    """Создает новый файл аккаунтов"""
+    try:
+        data = request.json or {}
+        filename = data.get('filename', '').strip()
+        content = data.get('content', '')
+        overwrite = data.get('overwrite', False)
+
+        safe_name = _normalize_account_filename(filename)
+        file_path = os.path.join(ACCOUNTS_DIR, safe_name)
+
+        if os.path.exists(file_path) and not overwrite:
+            return jsonify({'error': 'Файл с таким именем уже существует', 'filename': safe_name}), 400
+
+        with open(file_path, 'w', encoding='utf-8') as file_obj:
+            file_obj.write(content or '')
+
+        records = count_records_from_text(content or '')
+        return jsonify({
+            'success': True,
+            'filename': safe_name,
+            'records': records
+        })
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/accounts/files/<path:filename>', methods=['GET'])
+def api_accounts_file_content(filename):
+    """Возвращает содержимое файла аккаунтов"""
+    try:
+        safe_name = _normalize_account_filename(filename)
+        file_path = os.path.join(ACCOUNTS_DIR, safe_name)
+
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'Файл не найден'}), 404
+
+        with open(file_path, 'r', encoding='utf-8') as file_obj:
+            content = file_obj.read()
+
+        return jsonify({
+            'filename': safe_name,
+            'content': content,
+            'records': count_records_from_text(content)
+        })
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/accounts/files/<path:filename>', methods=['PUT'])
+def api_accounts_update_file(filename):
+    """Обновляет содержимое файла аккаунтов"""
+    try:
+        data = request.json or {}
+        content = data.get('content', '')
+
+        safe_name = _normalize_account_filename(filename)
+        file_path = os.path.join(ACCOUNTS_DIR, safe_name)
+
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'Файл не найден'}), 404
+
+        with open(file_path, 'w', encoding='utf-8') as file_obj:
+            file_obj.write(content or '')
+
+        records = count_records_from_text(content or '')
+        return jsonify({
+            'success': True,
+            'filename': safe_name,
+            'records': records
+        })
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/accounts/files/<path:filename>', methods=['DELETE'])
+def api_accounts_delete_file(filename):
+    """Удаляет файл аккаунтов"""
+    try:
+        safe_name = _normalize_account_filename(filename)
+        file_path = os.path.join(ACCOUNTS_DIR, safe_name)
+
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'Файл не найден'}), 404
+
+        os.remove(file_path)
+
+        return jsonify({'success': True, 'filename': safe_name})
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/accounts/files/<path:filename>/rename', methods=['POST'])
+def api_accounts_rename_file(filename):
+    """Переименовывает файл аккаунтов"""
+    try:
+        data = request.json or {}
+        new_name = data.get('filename', '').strip()
+        if not new_name:
+            return jsonify({'error': 'Новое имя файла не указано'}), 400
+
+        old_safe_name = _normalize_account_filename(filename)
+        new_safe_name = _normalize_account_filename(new_name)
+
+        old_path = os.path.join(ACCOUNTS_DIR, old_safe_name)
+        new_path = os.path.join(ACCOUNTS_DIR, new_safe_name)
+
+        if not os.path.exists(old_path):
+            return jsonify({'error': 'Исходный файл не найден'}), 404
+
+        if os.path.exists(new_path):
+            return jsonify({'error': 'Файл с таким именем уже существует'}), 400
+
+        os.rename(old_path, new_path)
+
+        return jsonify({
+            'success': True,
+            'old_filename': old_safe_name,
+            'filename': new_safe_name
+        })
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/accounts/upload', methods=['POST'])
+def api_accounts_upload():
+    """Загрузка файла аккаунтов через multipart форму"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'Файл не найден в запросе'}), 400
+
+        uploaded_file = request.files['file']
+        overwrite = request.form.get('overwrite', 'false').lower() == 'true'
+
+        if uploaded_file.filename == '':
+            return jsonify({'error': 'Имя файла не указано'}), 400
+
+        safe_name = _normalize_account_filename(uploaded_file.filename)
+        file_path = os.path.join(ACCOUNTS_DIR, safe_name)
+
+        if os.path.exists(file_path) and not overwrite:
+            return jsonify({'error': 'Файл с таким именем уже существует', 'filename': safe_name}), 400
+
+        uploaded_file.save(file_path)
+
+        return jsonify({
+            'success': True,
+            'filename': safe_name,
+            'records': count_records_in_file(file_path)
+        })
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/modules')
 def api_modules():
@@ -448,6 +787,48 @@ def api_modules():
         ]
     }
     return jsonify(modules)
+
+
+@app.route('/api/processes')
+def api_processes():
+    """Список всех запущенных и завершенных процессов"""
+    try:
+        processes = process_manager.get_processes_summary()
+        return jsonify({'processes': processes})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/processes/<command_id>')
+def api_process_details(command_id):
+    """Подробная информация о процессе"""
+    try:
+        details = process_manager.get_process_details(command_id)
+        if not details:
+            return jsonify({'error': 'Процесс не найден'}), 404
+
+        limit = request.args.get('limit', type=int)
+        total_logs = len(details.get('logs', []))
+        if limit and limit > 0:
+            details['logs'] = details['logs'][-limit:]
+        details['log_count'] = total_logs
+
+        return jsonify(details)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/processes/<command_id>', methods=['DELETE'])
+def api_process_delete(command_id):
+    """Удаляет информацию о процессе и его логах"""
+    try:
+        removed = process_manager.clear_process(command_id)
+        if not removed:
+            return jsonify({'error': 'Процесс не найден'}), 404
+        return jsonify({'success': True, 'command_id': command_id})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/test_command', methods=['POST'])
 def api_test_command():
@@ -565,11 +946,25 @@ def api_stop(command_id):
 def api_status(command_id):
     """API для получения статуса процесса"""
     try:
-        status = process_manager.get_process_status(command_id)
-        logs = process_manager.get_logs(command_id)
+        details = process_manager.get_process_details(command_id)
+        if not details:
+            return jsonify({'error': 'Процесс не найден'}), 404
+
+        limit = request.args.get('limit', default=200, type=int)
+        logs = details.get('logs', [])
+        total_logs = len(logs)
+        if limit and limit > 0:
+            logs = logs[-limit:]
+
         return jsonify({
-            'status': status,
-            'logs': logs
+            'status': process_manager.get_process_status(command_id),
+            'logs': logs,
+            'command': details.get('command'),
+            'started_at': details.get('started_at'),
+            'finished_at': details.get('finished_at'),
+            'exit_code': details.get('exit_code'),
+            'pid': details.get('pid'),
+            'log_count': total_logs
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -633,6 +1028,17 @@ def api_proxies_progress():
     """API для получения прогресса тестирования"""
     return jsonify(testing_progress)
 
+@app.route('/api/proxies/state')
+def api_proxies_state():
+    """Сводное состояние страницы прокси"""
+    return jsonify({
+        'progress': dict(testing_progress),
+        'is_running': testing_progress.get('is_running', False),
+        'working': list(current_working_proxies),
+        'unique': list(current_unique_proxies),
+        'exported_filename': last_exported_filename,
+    })
+
 @app.route('/api/proxies/working')
 def api_proxies_working():
     """API для получения рабочих прокси"""
@@ -648,49 +1054,70 @@ def api_proxies_unique():
 @app.route('/api/proxies/export', methods=['POST'])
 def api_export_proxies():
     """API для экспорта прокси в TSV файл"""
+    global last_exported_filename
     try:
         # Создаем директорию если не существует
         proxies_dir = os.path.join(CRYPTO_PLAYGROUND_PATH, 'files', 'proxies')
         os.makedirs(proxies_dir, exist_ok=True)
-        
+
         # Генерируем имя файла с текущей датой
         current_date = datetime.now().strftime('%d.%m.%y')
         filename = f'proxies{current_date}.tsv'
         file_path = os.path.join(proxies_dir, filename)
-        
+        relative_path = os.path.join('files', 'proxies', filename)
+
         # Сохраняем уникальные прокси в оригинальном формате
         with open(file_path, 'w', encoding='utf-8') as f:
             for proxy in current_unique_proxies:
                 original_format = original_formats.get(proxy, proxy)
                 f.write(original_format + '\n')
-        
+
+        last_exported_filename = filename
+
+        display_command = (
+            f"python supply\\sync_proxies_v2.py -f files\\proxies\\{filename}"
+        )
+
         return jsonify({
             'success': True,
             'filename': filename,
             'path': file_path,
-            'count': len(current_unique_proxies)
+            'relative_path': relative_path,
+            'count': len(current_unique_proxies),
+            'display_command': display_command
         })
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/proxies/sync', methods=['POST'])
 def api_sync_proxies():
     """API для синхронизации прокси с БД"""
+    global last_exported_filename
     try:
         data = request.json
-        filename = data.get('filename')
-        
+        filename = data.get('filename') if data else None
+
+        if not filename:
+            filename = last_exported_filename
+
         if not filename:
             return jsonify({'error': 'Имя файла не указано'}), 400
-        
+
+        filename = os.path.basename(filename)
+        relative_path = os.path.join('files', 'proxies', filename)
+        absolute_path = os.path.join(PROXIES_DIR, filename)
+
+        if not os.path.exists(absolute_path):
+            return jsonify({'error': 'Файл не найден для синхронизации'}), 404
+
         # Формируем команду синхронизации
-        file_path = f'files/proxies/{filename}'
-        command = f'python supply/sync_proxies_v2.py -f {file_path} --sync'
-        
+        script_path = os.path.join('supply', 'sync_proxies_v2.py')
+        command = f'python "{script_path}" -f "{relative_path}"'
+
         # Генерируем ID команды
         command_id = f"proxy_sync_{int(time.time())}"
-        
+
         # Запускаем процесс
         result = process_manager.start_process(command_id, command)
         
@@ -698,7 +1125,8 @@ def api_sync_proxies():
             return jsonify({
                 'success': True,
                 'command_id': command_id,
-                'command': command
+                'command': command,
+                'display_command': f"python supply\\sync_proxies_v2.py -f files\\proxies\\{filename}"
             })
         elif isinstance(result, tuple):
             success, error = result
@@ -706,7 +1134,8 @@ def api_sync_proxies():
                 return jsonify({
                     'success': True,
                     'command_id': command_id,
-                    'command': command
+                    'command': command,
+                    'display_command': f"python supply\\sync_proxies_v2.py -f files\\proxies\\{filename}"
                 })
             else:
                 return jsonify({'error': error}), 500
