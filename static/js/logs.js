@@ -34,28 +34,18 @@ class LogsViewer {
     }
 
     bindEvents() {
-        if (this.elements.refresh) {
-            this.elements.refresh.addEventListener('click', () => this.fetchProcesses(true));
-        }
-        if (this.elements.download) {
-            this.elements.download.addEventListener('click', () => this.downloadLogs());
-        }
-        if (this.elements.stop) {
-            this.elements.stop.addEventListener('click', () => this.stopCurrentProcess());
-        }
-        if (this.elements.remove) {
-            this.elements.remove.addEventListener('click', () => this.deleteCurrentProcess());
-        }
+        this.elements.refresh?.addEventListener('click', () => this.fetchProcesses(true));
+        this.elements.download?.addEventListener('click', () => this.downloadLogs());
+        this.elements.stop?.addEventListener('click', () => this.stopCurrentProcess());
+        this.elements.remove?.addEventListener('click', () => this.deleteCurrentProcess());
 
-        if (this.elements.filters && this.elements.filters.forEach) {
-            this.elements.filters.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    this.filter = btn.dataset.filter;
-                    this.elements.filters.forEach(item => item.classList.toggle('active', item === btn));
-                    this.renderProcessList();
-                });
+        this.elements.filters?.forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.filter = btn.dataset.filter;
+                this.elements.filters.forEach(item => item.classList.toggle('active', item === btn));
+                this.renderProcessList();
             });
-        }
+        });
     }
 
     startPolling() {
@@ -218,9 +208,7 @@ class LogsViewer {
         this.elements.finished.textContent = this.formatDate(data.finished_at);
         this.elements.exitCode.textContent = data.exit_code !== null && data.exit_code !== undefined ? data.exit_code : '—';
         this.elements.pid.textContent = data.pid || '—';
-        const logsArray = Array.isArray(data.logs) ? data.logs : [];
-        const hasCount = data.log_count !== undefined && data.log_count !== null;
-        this.elements.count.textContent = hasCount ? data.log_count : logsArray.length;
+        this.elements.count.textContent = data.log_count ?? data.logs?.length ?? 0;
 
         const statusClass = `status-badge ${data.status}`;
         this.elements.statusBadge.className = statusClass;

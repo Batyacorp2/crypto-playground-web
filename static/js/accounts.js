@@ -33,52 +33,28 @@ class AccountsManager {
     }
 
     bindEvents() {
-        if (this.elements.refresh) {
-            this.elements.refresh.addEventListener('click', () => this.fetchFiles(true));
-        }
-        if (this.elements.search) {
-            this.elements.search.addEventListener('input', () => this.applySearch());
-        }
-        if (this.elements.createButton) {
-            this.elements.createButton.addEventListener('click', () => this.createFile());
-        }
-        if (this.elements.createInput) {
-            this.elements.createInput.addEventListener('keydown', (event) => {
-                if (event.key === 'Enter') {
-                    event.preventDefault();
-                    this.createFile();
-                }
-            });
-        }
-        if (this.elements.uploadInput) {
-            this.elements.uploadInput.addEventListener('change', (event) => {
-                const target = event.target || event.srcElement;
-                const files = target && target.files;
-                const file = files && files[0];
-                if (file) {
-                    this.uploadFile(file);
-                    target.value = '';
-                }
-            });
-        }
-        if (this.elements.editor) {
-            this.elements.editor.addEventListener('input', () => this.handleEditorChange());
-        }
-        if (this.elements.saveButton) {
-            this.elements.saveButton.addEventListener('click', () => this.saveCurrentFile());
-        }
-        if (this.elements.revertButton) {
-            this.elements.revertButton.addEventListener('click', () => this.revertChanges());
-        }
-        if (this.elements.deleteButton) {
-            this.elements.deleteButton.addEventListener('click', () => this.deleteCurrentFile());
-        }
-        if (this.elements.renameButton) {
-            this.elements.renameButton.addEventListener('click', () => this.renameCurrentFile());
-        }
-        if (this.elements.downloadButton) {
-            this.elements.downloadButton.addEventListener('click', () => this.downloadCurrentFile());
-        }
+        this.elements.refresh?.addEventListener('click', () => this.fetchFiles(true));
+        this.elements.search?.addEventListener('input', () => this.applySearch());
+        this.elements.createButton?.addEventListener('click', () => this.createFile());
+        this.elements.createInput?.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                this.createFile();
+            }
+        });
+        this.elements.uploadInput?.addEventListener('change', (event) => {
+            const file = event.target.files?.[0];
+            if (file) {
+                this.uploadFile(file);
+                event.target.value = '';
+            }
+        });
+        this.elements.editor?.addEventListener('input', () => this.handleEditorChange());
+        this.elements.saveButton?.addEventListener('click', () => this.saveCurrentFile());
+        this.elements.revertButton?.addEventListener('click', () => this.revertChanges());
+        this.elements.deleteButton?.addEventListener('click', () => this.deleteCurrentFile());
+        this.elements.renameButton?.addEventListener('click', () => this.renameCurrentFile());
+        this.elements.downloadButton?.addEventListener('click', () => this.downloadCurrentFile());
     }
 
     async fetchFiles(showMessage = false) {
@@ -102,10 +78,7 @@ class AccountsManager {
     }
 
     applySearch() {
-        const query = (this.elements.search && this.elements.search.value
-            ? this.elements.search.value
-            : ''
-        ).toLowerCase();
+        const query = (this.elements.search?.value || '').toLowerCase();
         this.filteredFiles = this.files.filter(file => file.name.toLowerCase().includes(query));
         this.renderFileList();
     }
@@ -177,8 +150,7 @@ class AccountsManager {
                 content: this.originalContent,
                 filename: data.filename,
                 records: data.records,
-                size: (this.files.find(file => file.name === data.filename) || {}).size
-                    || this.originalContent.length,
+                size: this.files.find(file => file.name === data.filename)?.size || this.originalContent.length,
             });
 
             this.highlightSelected();
@@ -205,9 +177,7 @@ class AccountsManager {
     }
 
     highlightSelected() {
-        const buttons = this.elements.list
-            ? this.elements.list.querySelectorAll('.account-file')
-            : null;
+        const buttons = this.elements.list?.querySelectorAll('.account-file');
         if (!buttons) {
             return;
         }
@@ -284,9 +254,7 @@ class AccountsManager {
     }
 
     async createFile() {
-        const filename = this.elements.createInput
-            ? this.elements.createInput.value.trim()
-            : '';
+        const filename = (this.elements.createInput?.value || '').trim();
         if (!filename) {
             window.showNotification('Укажите имя файла', 'warning');
             return;

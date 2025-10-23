@@ -28,9 +28,7 @@ class NotificationCenter {
             notification.classList.add('show');
         });
 
-        const timeout = (options && typeof options.timeout === 'number')
-            ? options.timeout
-            : 5000;
+        const timeout = options.timeout ?? 5000;
         let autoHideTimer = null;
         if (timeout > 0) {
             autoHideTimer = setTimeout(() => this.dismiss(notification), timeout);

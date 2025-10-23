@@ -357,12 +357,8 @@ class ProxyTester {
         const workingCount = document.getElementById('workingProxiesCount');
         const uniqueCount = document.getElementById('uniqueProxiesCount');
 
-        const working = (this.currentResults && Array.isArray(this.currentResults.working_proxies))
-            ? this.currentResults.working_proxies
-            : [];
-        const unique = (this.currentResults && Array.isArray(this.currentResults.unique_proxies))
-            ? this.currentResults.unique_proxies
-            : [];
+        const working = this.currentResults?.working_proxies || [];
+        const unique = this.currentResults?.unique_proxies || [];
         const hasResults = working.length > 0 || unique.length > 0;
         const shouldShow = hasResults || showNoResults;
 
@@ -454,16 +450,15 @@ class ProxyTester {
     }
 
     async copyToClipboard() {
-        const uniqueProxies = (this.currentResults && Array.isArray(this.currentResults.unique_proxies))
-            ? this.currentResults.unique_proxies
-            : [];
+        const uniqueProxies = this.currentResults?.unique_proxies || [];
         if (!uniqueProxies.length) {
             this.showNotification('Нет результатов для копирования', 'error');
             return;
         }
 
         try {
-            await navigator.clipboard.writeText(uniqueProxies.join('\n'));
+            await navigator.clipboard.writeText(uniqueProxies.join('
+'));
             this.showNotification(`Скопировано ${uniqueProxies.length} уникальных прокси`, 'success');
         } catch (error) {
             console.error('Error copying to clipboard:', error);
@@ -472,9 +467,7 @@ class ProxyTester {
     }
 
     async exportToTsv() {
-        const uniqueProxies = (this.currentResults && Array.isArray(this.currentResults.unique_proxies))
-            ? this.currentResults.unique_proxies
-            : [];
+        const uniqueProxies = this.currentResults?.unique_proxies || [];
         if (!uniqueProxies.length) {
             this.showNotification('Нет результатов для экспорта', 'error');
             return;
@@ -616,32 +609,11 @@ class ProxyTester {
         }
     }
 
-    persistState() {
-        const proxyInput = document.getElementById('proxyInput');
-        const hasResults = !!(
-            this.currentResults &&
-            ((Array.isArray(this.currentResults.working_proxies) && this.currentResults.working_proxies.length > 0) ||
-                (Array.isArray(this.currentResults.unique_proxies) && this.currentResults.unique_proxies.length > 0))
-        );
-
-        const state = {
-            input: proxyInput ? proxyInput.value : '',
-            activeTab: this.activeTab,
-            exportedFilename: this.exportedFilename,
-            hasResults,
-        };
-
-        try {
-            localStorage.setItem(this.stateStorageKey, JSON.stringify(state));
-        } catch (error) {
-            console.warn('Не удалось сохранить состояние proxy tester:', error);
-        }
-    }
-
     showNotification(message, type = 'info') {
         if (window.notificationCenter) {
             window.notificationCenter.show(message, type);
         } else {
+            // Резервный вариант
             console.log(`[${type}] ${message}`);
         }
     }
