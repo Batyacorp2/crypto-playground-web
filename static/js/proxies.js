@@ -5,79 +5,136 @@
 class ProxyTester {
     constructor() {
         this.isTestingActive = false;
-        this.currentResults = null;
-        this.exportedFilename = null;
         this.progressInterval = null;
-        
-        console.log('ProxyTester initialized (HTTP polling version)');
-        
+        this.currentResults = {
+            working_proxies: [],
+            unique_proxies: [],
+        };
+        this.exportedFilename = null;
+        this.syncCommand = null;
+        this.stateStorageKey = 'cp_proxy_tester_state';
+        this.activeTab = 'unique';
+
+        this.restorePersistedState();
         this.setupEventListeners();
+        this.initializeState();
     }
-    
+
+    restorePersistedState() {
+        const rawState = localStorage.getItem(this.stateStorageKey);
+        const proxyInput = document.getElementById('proxyInput');
+
+        if (proxyInput) {
+            proxyInput.addEventListener('input', () => this.persistState());
+        }
+
+        if (!rawState) {
+            this.setExportedFilename(null, { skipPersist: true });
+            return;
+        }
+
+        try {
+            const state = JSON.parse(rawState);
+
+            if (proxyInput && typeof state.input === 'string') {
+                proxyInput.value = state.input;
+            }
+
+            if (typeof state.activeTab === 'string') {
+                this.activeTab = state.activeTab;
+            }
+
+            if (state.exportedFilename) {
+                this.setExportedFilename(state.exportedFilename, { skipPersist: true });
+            } else {
+                this.setExportedFilename(null, { skipPersist: true });
+            }
+        } catch (error) {
+            console.warn('Не удалось восстановить состояние proxy tester:', error);
+            this.setExportedFilename(null, { skipPersist: true });
+        }
+    }
+
     setupEventListeners() {
-        // Кнопка тестирования
-        document.getElementById('testProxies').addEventListener('click', () => {
-            this.startTesting();
-        });
-        
-        // Кнопка остановки
-        document.getElementById('stopTesting').addEventListener('click', () => {
-            this.stopTesting();
-        });
-        
-        // Кнопка очистки
-        document.getElementById('clearInput').addEventListener('click', () => {
-            document.getElementById('proxyInput').value = '';
-            this.hideResults();
-        });
-        
-        // Кнопка копирования
-        document.getElementById('copyResults').addEventListener('click', () => {
-            this.copyToClipboard();
-        });
-        
-        // Кнопка экспорта
-        document.getElementById('exportTsv').addEventListener('click', () => {
-            this.exportToTsv();
-        });
-        
-        // Кнопка синхронизации с БД
-        document.getElementById('syncDb').addEventListener('click', () => {
-            this.syncToDatabase();
-        });
-        
-        // Обработчики табов
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                this.switchTab(e.target.dataset.tab);
+        const testButton = document.getElementById('testProxies');
+        const stopButton = document.getElementById('stopTesting');
+        const clearButton = document.getElementById('clearInput');
+        const copyButton = document.getElementById('copyResults');
+        const exportButton = document.getElementById('exportTsv');
+        const syncButton = document.getElementById('syncDb');
+        const proxyInput = document.getElementById('proxyInput');
+
+        if (testButton) {
+            testButton.addEventListener('click', () => this.startTesting());
+        }
+
+        if (stopButton) {
+            stopButton.addEventListener('click', () => this.stopTesting());
+        }
+
+        if (clearButton) {
+            clearButton.addEventListener('click', () => {
+                if (proxyInput) {
+                    proxyInput.value = '';
+                }
+                this.hideResults();
+                this.persistState();
+            });
+        }
+
+        if (copyButton) {
+            copyButton.addEventListener('click', () => this.copyToClipboard());
+        }
+
+        if (exportButton) {
+            exportButton.addEventListener('click', () => this.exportToTsv());
+        }
+
+        if (syncButton) {
+            syncButton.addEventListener('click', () => this.syncToDatabase());
+        }
+
+        document.querySelectorAll('.tab-btn').forEach((btn) => {
+            btn.addEventListener('click', (event) => {
+                const tabName = event.currentTarget.dataset.tab;
+                this.switchTab(tabName);
             });
         });
     }
-    
+
+    async initializeState() {
+        await this.loadResults({ initial: true, restoreTab: true });
+    }
+
     async startTesting() {
         const proxyInput = document.getElementById('proxyInput');
+        if (!proxyInput) {
+            return;
+        }
+
         const proxies = proxyInput.value.trim();
-        
+
         if (!proxies) {
             this.showNotification('Введите список прокси для тестирования', 'error');
             return;
         }
-        
+
         try {
             const response = await fetch('/api/proxies/test', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ proxies: proxies })
+                body: JSON.stringify({ proxies }),
             });
-            
+
             const data = await response.json();
-            
-            if (data.success) {
+
+            if (response.ok && data.success) {
                 this.isTestingActive = true;
                 this.showTestingUI();
-                this.showNotification(data.message, 'success');
+                this.setExportedFilename(null);
+                this.showNotification(data.message || 'Тестирование запущено', 'success');
                 this.startProgressPolling();
             } else {
                 this.showNotification(data.error || 'Ошибка запуска тестирования', 'error');
@@ -87,42 +144,101 @@ class ProxyTester {
             this.showNotification('Ошибка соединения с сервером', 'error');
         }
     }
-    
+
     async stopTesting() {
         try {
             const response = await fetch('/api/proxies/stop', {
-                method: 'POST'
+                method: 'POST',
             });
-            
+
             const data = await response.json();
-            
-            if (data.success) {
+
+            if (response.ok && data.success) {
                 this.isTestingActive = false;
                 this.stopProgressPolling();
                 this.hideTestingUI();
                 this.showNotification('Тестирование остановлено', 'info');
+                await this.loadResults({ restoreTab: true });
+            } else {
+                this.showNotification(data.error || 'Не удалось остановить тестирование', 'error');
             }
         } catch (error) {
             console.error('Error stopping test:', error);
             this.showNotification('Ошибка остановки тестирования', 'error');
         }
     }
-    
+
+    showTestingUI() {
+        const testButton = document.getElementById('testProxies');
+        const stopButton = document.getElementById('stopTesting');
+        const progressSection = document.querySelector('.progress-section');
+        const progressText = document.querySelector('.progress-text');
+        const progressBar = document.querySelector('.progress-fill');
+
+        if (testButton) {
+            testButton.style.display = 'none';
+        }
+
+        if (stopButton) {
+            stopButton.style.display = 'inline-flex';
+        }
+
+        if (progressSection) {
+            progressSection.style.display = 'block';
+        }
+
+        if (progressText) {
+            progressText.textContent = 'Подготовка к тестированию...';
+        }
+
+        if (progressBar) {
+            progressBar.style.width = '0%';
+        }
+
+        this.hideResults();
+    }
+
+    hideTestingUI() {
+        const testButton = document.getElementById('testProxies');
+        const stopButton = document.getElementById('stopTesting');
+        const progressSection = document.querySelector('.progress-section');
+
+        if (testButton) {
+            testButton.style.display = 'inline-flex';
+        }
+
+        if (stopButton) {
+            stopButton.style.display = 'none';
+        }
+
+        if (progressSection) {
+            progressSection.style.display = 'none';
+        }
+    }
+
     startProgressPolling() {
-        // Опрашиваем прогресс каждую секунду
+        if (this.progressInterval) {
+            return;
+        }
+
         this.progressInterval = setInterval(async () => {
             try {
                 const response = await fetch('/api/proxies/progress');
+                if (!response.ok) {
+                    return;
+                }
+
                 const data = await response.json();
-                
                 this.updateProgress(data);
-                
+
                 if (!data.is_running && this.isTestingActive) {
-                    // Тестирование завершено
                     this.isTestingActive = false;
                     this.stopProgressPolling();
                     this.hideTestingUI();
-                    await this.loadResults();
+                    await this.loadResults({
+                        autoSwitchTab: 'unique',
+                        showNoResults: true,
+                    });
                     this.showNotification('Тестирование завершено!', 'success');
                 }
             } catch (error) {
@@ -130,191 +246,255 @@ class ProxyTester {
             }
         }, 1000);
     }
-    
+
     stopProgressPolling() {
         if (this.progressInterval) {
             clearInterval(this.progressInterval);
             this.progressInterval = null;
         }
     }
-    
-    async loadResults() {
-        try {
-            const [workingResponse, uniqueResponse] = await Promise.all([
-                fetch('/api/proxies/working'),
-                fetch('/api/proxies/unique')
-            ]);
-            
-            const workingData = await workingResponse.json();
-            const uniqueData = await uniqueResponse.json();
-            
-            this.currentResults = {
-                working_proxies: workingData.working || [],
-                unique_proxies: uniqueData.unique || []
-            };
-            
-            this.displayResults();
-        } catch (error) {
-            console.error('Error loading results:', error);
-            this.showNotification('Ошибка загрузки результатов', 'error');
-        }
-    }
-    
-    updateProgress(data) {
+
+    updateProgress(data = {}) {
         const progressBar = document.querySelector('.progress-fill');
         const progressText = document.querySelector('.progress-text');
         const statsElements = {
             tested: document.getElementById('testedCount'),
             working: document.getElementById('workingCount'),
             unique: document.getElementById('uniqueCount'),
-            failed: document.getElementById('failedCount')
+            failed: document.getElementById('failedCount'),
         };
-        
-        if (data.total > 0) {
-            const percentage = Math.round((data.current / data.total) * 100);
-            
-            if (progressBar) {
-                progressBar.style.width = percentage + '%';
+
+        const total = Number(data.total) || 0;
+        const current = Number(data.current) || 0;
+        const percentage = total > 0 ? Math.round((current / total) * 100) : 0;
+
+        if (progressBar) {
+            progressBar.style.width = `${percentage}%`;
+        }
+
+        if (progressText) {
+            progressText.textContent = total > 0
+                ? `${current}/${total} (${percentage}%)`
+                : 'Ожидание результатов...';
+        }
+
+        if (statsElements.tested) statsElements.tested.textContent = current;
+        if (statsElements.working) statsElements.working.textContent = Number(data.working) || 0;
+        if (statsElements.unique) statsElements.unique.textContent = Number(data.unique_ips) || 0;
+        if (statsElements.failed) statsElements.failed.textContent = Number(data.failed) || 0;
+    }
+
+    async loadResults(options = {}) {
+        const { initial = false, autoSwitchTab = null, showNoResults = false, restoreTab = false } = options;
+
+        try {
+            const response = await fetch('/api/proxies/state');
+            if (!response.ok) {
+                throw new Error('Bad response');
             }
-            
-            if (progressText) {
-                progressText.textContent = `${data.current}/${data.total} (${percentage}%)`;
+
+            const data = await response.json();
+            this.applyState(data, {
+                initial,
+                autoSwitchTab,
+                showNoResults,
+                restoreTab,
+            });
+        } catch (error) {
+            console.error('Error loading results:', error);
+            if (!initial) {
+                this.showNotification('Ошибка загрузки результатов', 'error');
             }
         }
-        
-        // Обновляем статистику
-        if (statsElements.tested) statsElements.tested.textContent = data.current || 0;
-        if (statsElements.working) statsElements.working.textContent = data.working || 0;
-        if (statsElements.unique) statsElements.unique.textContent = data.unique_ips || 0;
-        if (statsElements.failed) statsElements.failed.textContent = data.failed || 0;
     }
-    
-    showTestingUI() {
-        const testButton = document.getElementById('testProxies');
-        const stopButton = document.getElementById('stopTesting');
-        const progressSection = document.querySelector('.progress-section');
-        
-        if (testButton) {
-            testButton.style.display = 'none';
+
+    applyState(data = {}, options = {}) {
+        const { initial = false, autoSwitchTab = null, showNoResults = false, restoreTab = false } = options;
+
+        if (data.is_running) {
+            this.isTestingActive = true;
+            this.showTestingUI();
+            this.startProgressPolling();
+        } else {
+            this.isTestingActive = false;
+            this.hideTestingUI();
+            this.stopProgressPolling();
         }
-        
-        if (stopButton) {
-            stopButton.style.display = 'inline-block';
+
+        if (data.progress) {
+            this.updateProgress(data.progress);
         }
-        
-        if (progressSection) {
-            progressSection.style.display = 'block';
-        }
-        
-        this.hideResults();
+
+        const working = Array.isArray(data.working) ? data.working : [];
+        const unique = Array.isArray(data.unique) ? data.unique : [];
+
+        this.currentResults = {
+            working_proxies: working,
+            unique_proxies: unique,
+        };
+
+        const hasAnyResults = working.length > 0 || unique.length > 0;
+
+        this.displayResults({
+            autoSwitchTab,
+            restoreTab,
+            showNoResults: showNoResults && !hasAnyResults,
+        });
+
+        const exportedFilename = data.exported_filename || null;
+        this.setExportedFilename(exportedFilename, { skipPersist: true });
+
+        this.persistState();
     }
-    
-    hideTestingUI() {
-        const testButton = document.getElementById('testProxies');
-        const stopButton = document.getElementById('stopTesting');
-        const progressSection = document.querySelector('.progress-section');
-        
-        if (testButton) {
-            testButton.style.display = 'inline-block';
-        }
-        
-        if (stopButton) {
-            stopButton.style.display = 'none';
-        }
-        
-        if (progressSection) {
-            progressSection.style.display = 'none';
-        }
-    }
-    
-    displayResults() {
-        if (!this.currentResults) return;
-        
+
+    displayResults(options = {}) {
+        const { autoSwitchTab = null, restoreTab = false, showNoResults = false } = options;
+
         const resultsSection = document.querySelector('.results-section');
+        const noResultsBlock = document.getElementById('noResults');
         const workingList = document.getElementById('workingProxies');
         const uniqueList = document.getElementById('uniqueProxies');
         const workingCount = document.getElementById('workingProxiesCount');
         const uniqueCount = document.getElementById('uniqueProxiesCount');
-        
+
+        const working = this.currentResults?.working_proxies || [];
+        const unique = this.currentResults?.unique_proxies || [];
+        const hasResults = working.length > 0 || unique.length > 0;
+        const shouldShow = hasResults || showNoResults;
+
+        if (!shouldShow) {
+            if (resultsSection) {
+                resultsSection.style.display = 'none';
+            }
+            if (noResultsBlock) {
+                noResultsBlock.style.display = 'none';
+            }
+            if (workingCount) workingCount.textContent = '0';
+            if (uniqueCount) uniqueCount.textContent = '0';
+            return;
+        }
+
         if (resultsSection) {
             resultsSection.style.display = 'block';
         }
-        
-        // Отображаем рабочие прокси
-        if (workingList && this.currentResults.working_proxies) {
-            if (this.currentResults.working_proxies.length > 0) {
-                workingList.innerHTML = this.currentResults.working_proxies
-                    .map(proxy => `<div class="proxy-item">${proxy}</div>`)
+
+        if (workingCount) workingCount.textContent = working.length;
+        if (uniqueCount) uniqueCount.textContent = unique.length;
+
+        if (noResultsBlock) {
+            noResultsBlock.style.display = hasResults ? 'none' : 'block';
+        }
+
+        if (hasResults) {
+            if (workingList) {
+                workingList.innerHTML = working
+                    .map((proxy) => `<div class="proxy-item">${proxy}</div>`)
                     .join('');
-            } else {
+            }
+
+            if (uniqueList) {
+                uniqueList.innerHTML = unique
+                    .map((proxy) => `<div class="proxy-item">${proxy}</div>`)
+                    .join('');
+            }
+        } else {
+            if (workingList) {
                 workingList.innerHTML = '<div class="empty-state">Рабочие прокси не найдены</div>';
             }
-        }
-        
-        // Отображаем уникальные прокси
-        if (uniqueList && this.currentResults.unique_proxies) {
-            if (this.currentResults.unique_proxies.length > 0) {
-                uniqueList.innerHTML = this.currentResults.unique_proxies
-                    .map(proxy => `<div class="proxy-item">${proxy}</div>`)
-                    .join('');
-            } else {
+
+            if (uniqueList) {
                 uniqueList.innerHTML = '<div class="empty-state">Уникальные прокси не найдены</div>';
             }
         }
-        
-        // Обновляем счетчики
-        if (workingCount) {
-            workingCount.textContent = this.currentResults.working_proxies.length;
+
+        let targetTab = autoSwitchTab;
+        if (!targetTab) {
+            if (restoreTab && this.activeTab) {
+                targetTab = this.activeTab;
+            } else if (unique.length > 0) {
+                targetTab = 'unique';
+            } else {
+                targetTab = 'working';
+            }
         }
-        
-        if (uniqueCount) {
-            uniqueCount.textContent = this.currentResults.unique_proxies.length;
-        }
+
+        this.switchTab(targetTab, { skipSave: !autoSwitchTab && restoreTab });
     }
-    
-    hideResults() {
+
+    hideResults(options = {}) {
+        const { preserveState = false } = options;
         const resultsSection = document.querySelector('.results-section');
+        const noResultsBlock = document.getElementById('noResults');
+        const workingList = document.getElementById('workingProxies');
+        const uniqueList = document.getElementById('uniqueProxies');
+        const workingCount = document.getElementById('workingProxiesCount');
+        const uniqueCount = document.getElementById('uniqueProxiesCount');
+
         if (resultsSection) {
             resultsSection.style.display = 'none';
         }
-        this.currentResults = null;
+        if (noResultsBlock) {
+            noResultsBlock.style.display = 'none';
+        }
+        if (!preserveState) {
+            this.currentResults = {
+                working_proxies: [],
+                unique_proxies: [],
+            };
+            if (workingList) workingList.innerHTML = '';
+            if (uniqueList) uniqueList.innerHTML = '';
+            if (workingCount) workingCount.textContent = '0';
+            if (uniqueCount) uniqueCount.textContent = '0';
+            this.persistState();
+        }
     }
-    
+
     async copyToClipboard() {
-        if (!this.currentResults || !this.currentResults.unique_proxies.length) {
+        const uniqueProxies = this.currentResults?.unique_proxies || [];
+        if (!uniqueProxies.length) {
             this.showNotification('Нет результатов для копирования', 'error');
             return;
         }
-        
+
         try {
-            const text = this.currentResults.unique_proxies.join('\n');
-            await navigator.clipboard.writeText(text);
-            this.showNotification(`Скопировано ${this.currentResults.unique_proxies.length} уникальных прокси`, 'success');
+            await navigator.clipboard.writeText(uniqueProxies.join('\n'));
+            this.showNotification(`Скопировано ${uniqueProxies.length} уникальных прокси`, 'success');
         } catch (error) {
             console.error('Error copying to clipboard:', error);
             this.showNotification('Ошибка копирования в буфер обмена', 'error');
         }
     }
-    
+
     async exportToTsv() {
-        if (!this.currentResults || !this.currentResults.unique_proxies.length) {
+        const uniqueProxies = this.currentResults?.unique_proxies || [];
+        if (!uniqueProxies.length) {
             this.showNotification('Нет результатов для экспорта', 'error');
             return;
         }
-        
+
         try {
             const response = await fetch('/api/proxies/export', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
-                }
+                    'Content-Type': 'application/json',
+                },
             });
-            
+
             const data = await response.json();
-            
-            if (data.success) {
-                this.exportedFilename = data.filename;
-                this.showNotification(`Экспортировано в файл: ${data.filename}`, 'success');
+
+            if (response.ok && data.success) {
+                this.setExportedFilename(data.filename);
+
+                const command = data.display_command || `python supply\sync_proxies_v2.py -f files\proxies\${data.filename}`;
+                this.syncCommand = command;
+
+                const syncButton = document.getElementById('syncDb');
+                if (syncButton) {
+                    syncButton.setAttribute('title', command);
+                }
+
+                const count = Number(data.count) || uniqueProxies.length;
+                this.showNotification(`Экспортировано ${count} уникальных прокси в файл ${data.filename}`, 'success');
             } else {
                 this.showNotification(data.error || 'Ошибка экспорта', 'error');
             }
@@ -323,103 +503,138 @@ class ProxyTester {
             this.showNotification('Ошибка экспорта файла', 'error');
         }
     }
-    
+
+    setExportedFilename(filename, options = {}) {
+        const { skipPersist = false } = options;
+        this.exportedFilename = filename || null;
+        this.syncCommand = this.exportedFilename
+            ? `python supply\sync_proxies_v2.py -f files\proxies\${this.exportedFilename}`
+            : null;
+
+        const syncButton = document.getElementById('syncDb');
+
+        if (syncButton) {
+            if (this.exportedFilename) {
+                syncButton.style.display = 'inline-flex';
+                syncButton.disabled = false;
+                syncButton.dataset.filename = this.exportedFilename;
+                if (this.syncCommand) {
+                    syncButton.setAttribute('title', this.syncCommand);
+                }
+            } else {
+                syncButton.style.display = 'none';
+                syncButton.disabled = true;
+                syncButton.removeAttribute('data-filename');
+                syncButton.removeAttribute('title');
+            }
+        }
+
+        if (!skipPersist) {
+            this.persistState();
+        }
+    }
+
     async syncToDatabase() {
-        if (!this.currentResults || !this.currentResults.unique_proxies.length) {
-            this.showNotification('Нет результатов для синхронизации', 'error');
+        if (!this.exportedFilename) {
+            this.showNotification('Сначала выгрузите данные в TSV файл', 'error');
             return;
         }
-        
+
+        const syncButton = document.getElementById('syncDb');
+        if (syncButton) {
+            syncButton.disabled = true;
+        }
+
         try {
             const response = await fetch('/api/proxies/sync', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
-                }
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ filename: this.exportedFilename }),
             });
-            
+
             const data = await response.json();
-            
-            if (data.success) {
-                this.showNotification(`Синхронизировано ${data.count} прокси с базой данных`, 'success');
+
+            if (response.ok && data.success) {
+                const commandHint = data.display_command || this.syncCommand || '';
+                if (commandHint) {
+                    this.syncCommand = commandHint;
+                    if (syncButton) {
+                        syncButton.setAttribute('title', commandHint);
+                    }
+                }
+                const message = commandHint
+                    ? `Синхронизация запущена: ${commandHint}`
+                    : 'Синхронизация запущена. Проверяйте раздел логов.';
+                this.showNotification(message, 'success');
             } else {
                 this.showNotification(data.error || 'Ошибка синхронизации', 'error');
             }
         } catch (error) {
             console.error('Error syncing:', error);
             this.showNotification('Ошибка синхронизации с базой данных', 'error');
+        } finally {
+            if (syncButton) {
+                syncButton.disabled = false;
+            }
         }
     }
-    
-    switchTab(tabName) {
-        // Убираем активный класс со всех кнопок и панелей
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-        document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
-        
-        // Добавляем активный класс к выбранным элементам
-        document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-        document.getElementById(`${tabName}Proxies`).classList.add('active');
+
+    switchTab(tabName, options = {}) {
+        if (!tabName) {
+            return;
+        }
+
+        const { skipSave = false } = options;
+
+        document.querySelectorAll('.tab-btn').forEach((btn) => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach((pane) => pane.classList.remove('active'));
+
+        const tabButton = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
+        const pane = document.getElementById(`${tabName}Proxies`);
+
+        if (!tabButton || !pane) {
+            return;
+        }
+
+        tabButton.classList.add('active');
+        pane.classList.add('active');
+
+        this.activeTab = tabName;
+
+        if (!skipSave) {
+            this.persistState();
+        }
     }
-    
-    showNotification(message, type = 'info') {
-        // Создаем уведомление
-        const notification = document.createElement('div');
-        notification.className = `notification ${type}`;
-        notification.textContent = message;
-        
-        // Добавляем стили
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 12px 20px;
-            border-radius: 6px;
-            color: white;
-            font-weight: 500;
-            z-index: 1000;
-            max-width: 400px;
-            word-wrap: break-word;
-            animation: slideIn 0.3s ease-out;
-        `;
-        
-        // Цвета для разных типов
-        const colors = {
-            success: '#10a37f',
-            error: '#dc3545',
-            info: '#0ea5e9',
-            warning: '#f59e0b'
+
+    persistState() {
+        const proxyInput = document.getElementById('proxyInput');
+        const hasResults = !!(
+            this.currentResults &&
+            ((Array.isArray(this.currentResults.working_proxies) && this.currentResults.working_proxies.length > 0) ||
+                (Array.isArray(this.currentResults.unique_proxies) && this.currentResults.unique_proxies.length > 0))
+        );
+
+        const state = {
+            input: proxyInput ? proxyInput.value : '',
+            activeTab: this.activeTab,
+            exportedFilename: this.exportedFilename,
+            hasResults,
         };
-        
-        notification.style.backgroundColor = colors[type] || colors.info;
-        
-        // Добавляем на страницу
-        document.body.appendChild(notification);
-        
-        // Удаляем через 5 секунд
-        setTimeout(() => {
-            notification.style.animation = 'slideOut 0.3s ease-in';
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.parentNode.removeChild(notification);
-                }
-            }, 300);
-        }, 5000);
-        
-        // Добавляем CSS анимации если их еще нет
-        if (!document.getElementById('notification-styles')) {
-            const style = document.createElement('style');
-            style.id = 'notification-styles';
-            style.textContent = `
-                @keyframes slideIn {
-                    from { transform: translateX(100%); opacity: 0; }
-                    to { transform: translateX(0); opacity: 1; }
-                }
-                @keyframes slideOut {
-                    from { transform: translateX(0); opacity: 1; }
-                    to { transform: translateX(100%); opacity: 0; }
-                }
-            `;
-            document.head.appendChild(style);
+
+        try {
+            localStorage.setItem(this.stateStorageKey, JSON.stringify(state));
+        } catch (error) {
+            console.warn('Не удалось сохранить состояние proxy tester:', error);
+        }
+    }
+
+    showNotification(message, type = 'info') {
+        if (window.notificationCenter) {
+            window.notificationCenter.show(message, type);
+        } else {
+            console.log(`[${type}] ${message}`);
         }
     }
 }
