@@ -244,42 +244,17 @@ class ModulesManager {
     }
     
     showNotification(message, type) {
-        // Создаем уведомление
-        const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
-        notification.innerHTML = `
-            <div class="notification-content">
-                <span class="notification-message">${message}</span>
-                <button class="notification-close">&times;</button>
-            </div>
-        `;
-        
-        // Добавляем в DOM
-        document.body.appendChild(notification);
-        
-        // Показываем уведомление
-        setTimeout(() => {
-            notification.classList.add('show');
-        }, 100);
-        
-        // Обработчик закрытия
-        notification.querySelector('.notification-close').addEventListener('click', () => {
-            this.hideNotification(notification);
-        });
-        
-        // Автоматическое скрытие через 5 секунд
-        setTimeout(() => {
-            this.hideNotification(notification);
-        }, 5000);
+        if (window.notificationCenter) {
+            window.notificationCenter.show(message, type);
+        } else {
+            console.log(`[${type}] ${message}`);
+        }
     }
-    
+
     hideNotification(notification) {
-        notification.classList.remove('show');
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
-        }, 300);
+        if (notification && notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+        }
     }
 }
 
