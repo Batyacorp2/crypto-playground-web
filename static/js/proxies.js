@@ -609,32 +609,11 @@ class ProxyTester {
         }
     }
 
-    persistState() {
-        const proxyInput = document.getElementById('proxyInput');
-        const hasResults = !!(
-            this.currentResults &&
-            ((Array.isArray(this.currentResults.working_proxies) && this.currentResults.working_proxies.length > 0) ||
-                (Array.isArray(this.currentResults.unique_proxies) && this.currentResults.unique_proxies.length > 0))
-        );
-
-        const state = {
-            input: proxyInput ? proxyInput.value : '',
-            activeTab: this.activeTab,
-            exportedFilename: this.exportedFilename,
-            hasResults,
-        };
-
-        try {
-            localStorage.setItem(this.stateStorageKey, JSON.stringify(state));
-        } catch (error) {
-            console.warn('Не удалось сохранить состояние proxy tester:', error);
-        }
-    }
-
     showNotification(message, type = 'info') {
         if (window.notificationCenter) {
             window.notificationCenter.show(message, type);
         } else {
+            // Резервный вариант
             console.log(`[${type}] ${message}`);
         }
     }
