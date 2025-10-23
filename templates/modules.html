@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+
+{% block title %}Модули - Crypto Playground{% endblock %}
+
+{% block content %}
+<div class="content-wrapper">
+    <div class="page-header">
+        <h1>Модули автоматизации</h1>
+        <p>Выберите модуль для запуска автоматизированных задач</p>
+    </div>
+
+    <!-- Главная страница модулей -->
+    <div id="modulesMain" class="modules-main">
+        <div class="modules-grid">
+            <div class="module-card" data-module="telegram">
+                <div class="module-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+                    </svg>
+                </div>
+                <h3>Telegram</h3>
+                <p>Автоматизация действий в Telegram</p>
+            </div>
+
+            <div class="module-card" data-module="2gis">
+                <div class="module-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                        <circle cx="12" cy="10" r="3"/>
+                    </svg>
+                </div>
+                <h3>2Gis</h3>
+                <p>Работа с картами и организациями 2Gis</p>
+            </div>
+
+            <div class="module-card" data-module="discord">
+                <div class="module-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 12l2 2 4-4"/>
+                        <path d="M21 12c-1 0-3-1-3-3s2-3 3-3 3 1 3 3-2 3-3 3"/>
+                        <path d="M3 12c1 0 3-1 3-3s-2-3-3-3-3 1-3 3 2 3 3 3"/>
+                    </svg>
+                </div>
+                <h3>Discord</h3>
+                <p>Автоматизация действий в Discord</p>
+            </div>
+
+            <div class="module-card" data-module="twitter">
+                <div class="module-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z"/>
+                    </svg>
+                </div>
+                <h3>X (Twitter)</h3>
+                <p>Автоматизация действий в X (Twitter)</p>
+            </div>
+
+            <div class="module-card" data-module="vk">
+                <div class="module-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                        <circle cx="12" cy="7" r="4"/>
+                    </svg>
+                </div>
+                <h3>VK</h3>
+                <p>Автоматизация действий в ВКонтакте</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Подмодули 2Gis -->
+    <div id="modules2gis" class="module-submenu" style="display: none;">
+        <div class="submenu-header">
+            <button id="backToMain" class="btn btn-secondary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5"/>
+                    <path d="M12 19l-7-7 7-7"/>
+                </svg>
+                Назад
+            </button>
+            <h2>Модули 2Gis</h2>
+        </div>
+        
+        <div class="submenu-grid">
+            <div class="submodule-card" data-submodule="2gis-comment">
+                <div class="submodule-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                </div>
+                <h4>2gis comment</h4>
+                <p>Создание комментариев для организаций</p>
+            </div>
+
+            <div class="submodule-card" data-submodule="2gis-parse">
+                <div class="submodule-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14,2 14,8 20,8"/>
+                    </svg>
+                </div>
+                <h4>2gis parse</h4>
+                <p>Парсинг данных организаций</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Форма 2gis comment -->
+    <div id="form2gisComment" class="module-form" style="display: none;">
+        <div class="form-header">
+            <button id="backTo2gis" class="btn btn-secondary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5"/>
+                    <path d="M12 19l-7-7 7-7"/>
+                </svg>
+                Назад к 2Gis
+            </button>
+            <h2>2Gis Comment</h2>
+        </div>
+
+        <div class="form-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Данные для комментариев</h3>
+                    <div class="format-info">
+                        <small>Формат данных:</small>
+                        <code>ID &lt;TAB&gt; название адрес &lt;TAB&gt; комментарий</code>
+                        <p>Пример:</p>
+                        <code>0x13f15E0bD64dB813111B88D4ec16F2c321824589	Зоосфера, улица 70 лет Октября, 29, Омск	Покупала корм для кошки, выбор широкий, продавцы знают продукцию, помогают с выбором.</code>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <textarea id="commentData" class="form-control" rows="10" 
+                              placeholder="Вставьте данные для комментариев в формате:&#10;ID	название адрес	комментарий&#10;&#10;Каждая строка - отдельный комментарий"></textarea>
+                    
+                    <div class="form-actions">
+                        <button id="saveCommentData" class="btn btn-info">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                <polyline points="17,21 17,13 7,13 7,21"/>
+                                <polyline points="7,3 7,8 15,8"/>
+                            </svg>
+                            Сохранить данные
+                        </button>
+                        <button id="run2gisComment" class="btn btn-success" style="display: none;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="5,3 19,12 5,21"/>
+                            </svg>
+                            Запустить 2Gis
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Статус выполнения -->
+            <div id="executionStatus" class="execution-status" style="display: none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Статус выполнения</h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="statusInfo" class="status-info"></div>
+                        <div id="executionLogs" class="execution-logs"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/modules.js') }}"></script>
+{% endblock %}

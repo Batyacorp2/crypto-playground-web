@@ -1,0 +1,1008 @@
+/* Сброс стилей */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background-color: #212121;
+    color: #ececec;
+    height: 100vh;
+}
+
+/* Контейнер приложения */
+.app-container {
+    display: flex;
+    height: 100vh;
+}
+
+/* Боковая панель */
+.sidebar {
+    width: 260px;
+    background-color: #171717;
+    border-right: 1px solid #2f2f2f;
+    display: flex;
+    flex-direction: column;
+    transition: width 0.3s ease;
+    position: relative;
+}
+
+.sidebar.collapsed {
+    width: 68px;
+}
+
+/* Removed hover effect for sidebar width */
+
+/* Заголовок боковой панели */
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    border-bottom: 1px solid #2f2f2f;
+    min-height: 64px;
+    overflow: hidden;
+}
+
+.sidebar.collapsed .sidebar-header {
+    justify-content: center;
+    padding: 16px 8px;
+}
+
+/* Removed hover effect for sidebar header */
+
+.logo-container {
+    display: flex;
+    align-items: center;
+}
+
+.logo {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+/* Кнопка скрытия боковой панели */
+.sidebar-toggle {
+    background: none;
+    border: none;
+    color: #8e8ea0;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.sidebar-toggle:hover {
+    background-color: #2f2f2f;
+    color: #ececec;
+}
+
+/* Стили для иконки в кнопке закрытия */
+.toggle-icon {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.sidebar-toggle:hover .toggle-icon {
+    opacity: 1;
+}
+
+.sidebar.collapsed .sidebar-header .sidebar-toggle {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* Removed hover effect for sidebar toggle */
+
+/* Кнопка открытия боковой панели удалена - не нужна */
+
+/* Навигация */
+.sidebar-nav {
+    flex: 1;
+    padding: 16px 0;
+}
+
+.nav-menu {
+    list-style: none;
+}
+
+.nav-item {
+    margin-bottom: 4px;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    color: #8e8ea0;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border-radius: 6px;
+    margin: 0 8px;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.nav-link:hover {
+    background-color: #2f2f2f;
+    color: #ececec;
+}
+
+.nav-link.active {
+    background-color: #2f2f2f;
+    color: #ececec;
+}
+
+.nav-link svg {
+    margin-right: 12px;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+}
+
+.sidebar.collapsed .nav-link {
+    padding: 12px;
+    margin: 4px 8px;
+    justify-content: center;
+}
+
+.sidebar.collapsed .nav-link svg {
+    margin-right: 0;
+}
+
+.sidebar.collapsed .nav-link span {
+    display: none;
+}
+
+/* Removed hover effects for navigation links - sidebar opens only by button */
+
+/* Основной контент */
+.main-content {
+    flex: 1;
+    background-color: #212121;
+    overflow-y: auto;
+    padding: 32px;
+    position: relative;
+}
+
+/* Кнопка показа боковой панели удалена - используется клик по логотипу */
+
+/* Заголовки */
+h1 {
+    font-size: 2rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #ececec;
+}
+
+.subtitle {
+    color: #8e8ea0;
+    margin-bottom: 32px;
+}
+
+/* Карточки */
+.cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+    margin-top: 32px;
+}
+
+.card {
+    background-color: #2f2f2f;
+    border: 1px solid #404040;
+    border-radius: 12px;
+    padding: 24px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+}
+
+.card:hover {
+    background-color: #3a3a3a;
+    border-color: #505050;
+    transform: translateY(-2px);
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 16px;
+    color: white;
+}
+
+.card-icon.modules {
+    background-color: #10b981;
+}
+
+.card-icon.accounts {
+    background-color: #3b82f6;
+}
+
+.card-icon.logs {
+    background-color: #f59e0b;
+}
+
+.card-content h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #ececec;
+}
+
+.card-content .card-subtitle {
+    color: #8e8ea0;
+    font-size: 0.875rem;
+}
+
+.card-description {
+    color: #a1a1aa;
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .main-content {
+        padding: 16px;
+    }
+    
+    .cards-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    
+    h1 {
+        font-size: 1.5rem;
+    }
+}
+
+/* Стили для страницы прокси */
+.proxy-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    height: calc(100vh - 120px);
+}
+
+.proxy-input-section,
+.proxy-results-section {
+    display: flex;
+    flex-direction: column;
+}
+
+.proxy-input-section .card,
+.proxy-results-section .card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.proxy-input-section .card-body,
+.proxy-results-section .card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.form-control {
+    width: 100%;
+    padding: 12px;
+    background-color: #2a2a2a;
+    border: 1px solid #404040;
+    border-radius: 6px;
+    color: #ececec;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    resize: vertical;
+    flex: 1;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.form-control::placeholder {
+    color: #888;
+}
+
+.format-info {
+    margin-top: 8px;
+    padding: 12px;
+    background-color: #2a2a2a;
+    border-radius: 6px;
+    border-left: 3px solid #007bff;
+}
+
+.format-info small {
+    color: #ccc;
+    font-weight: 500;
+}
+
+.format-info ul {
+    margin: 8px 0 0 16px;
+    color: #aaa;
+}
+
+.format-info li {
+    margin: 4px 0;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+}
+
+.input-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+}
+
+.btn-primary {
+    background-color: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: #545b62;
+}
+
+.btn-info {
+    background-color: #17a2b8;
+    color: white;
+}
+
+.btn-info:hover {
+    background-color: #117a8b;
+}
+
+.btn-success {
+    background-color: #28a745;
+    color: white;
+}
+
+.btn-success:hover {
+    background-color: #1e7e34;
+}
+
+.testing-progress {
+    padding: 20px;
+    background-color: #2a2a2a;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.progress-info {
+    margin-bottom: 16px;
+}
+
+.progress-stats {
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #ccc;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background-color: #404040;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background-color: #007bff;
+    transition: width 0.3s ease;
+    border-radius: 4px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background-color: #333;
+    border-radius: 6px;
+}
+
+.stat-label {
+    color: #aaa;
+    font-size: 14px;
+}
+
+.stat-value {
+    color: #007bff;
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.results-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #404040;
+}
+
+.results-header h4 {
+    color: #ececec;
+    margin: 0;
+}
+
+.results-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.proxy-list {
+    flex: 1;
+    overflow-y: auto;
+    background-color: #2a2a2a;
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.proxy-items {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.proxy-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background-color: #333;
+    border-radius: 6px;
+    border-left: 3px solid #28a745;
+}
+
+.proxy-item.more-results {
+    border-left-color: #6c757d;
+    justify-content: center;
+}
+
+.proxy-number {
+    color: #6c757d;
+    font-weight: 600;
+    min-width: 24px;
+    text-align: center;
+}
+
+.proxy-address {
+    flex: 1;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    color: #ececec;
+}
+
+.proxy-status {
+    color: #28a745;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.more-text {
+    color: #aaa;
+    font-style: italic;
+}
+
+.no-results {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    text-align: center;
+    color: #6c757d;
+}
+
+.no-results svg {
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.no-results h4 {
+    margin-bottom: 8px;
+    color: #aaa;
+}
+
+.no-results p {
+    color: #888;
+}
+
+/* Уведомления */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    max-width: 400px;
+    background-color: #333;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    z-index: 1000;
+}
+
+.notification.show {
+    transform: translateX(0);
+}
+
+.notification-success {
+    border-left: 4px solid #28a745;
+}
+
+.notification-error {
+    border-left: 4px solid #dc3545;
+}
+
+.notification-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+}
+
+.notification-message {
+    color: #ececec;
+    font-size: 14px;
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    color: #aaa;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 12px;
+}
+
+.notification-close:hover {
+    color: #ececec;
+}
+
+/* Адаптивность для прокси */
+@media (max-width: 1200px) {
+    .proxy-container {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    
+    .stats-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .results-header {
+        flex-direction: column;
+        gap: 12px;
+        align-items: stretch;
+    }
+    
+    .results-actions {
+        justify-content: center;
+    }
+    
+    .input-actions {
+        flex-direction: column;
+    }
+}
+
+/* Стили для страницы модулей */
+.modules-main {
+    padding: 20px 0;
+}
+
+.modules-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+    margin-bottom: 32px;
+}
+
+.module-card {
+    background-color: #2a2a2a;
+    border: 1px solid #404040;
+    border-radius: 12px;
+    padding: 24px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+}
+
+.module-card:hover {
+    background-color: #333;
+    border-color: #007bff;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 123, 255, 0.15);
+}
+
+.module-icon {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 64px;
+    height: 64px;
+    background-color: #007bff;
+    border-radius: 12px;
+    margin: 0 auto 16px;
+    color: white;
+}
+
+.module-card h3 {
+    color: #ececec;
+    margin-bottom: 8px;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.module-card p {
+    color: #aaa;
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 0;
+}
+
+/* Подменю модулей */
+.module-submenu {
+    padding: 20px 0;
+}
+
+.submenu-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #404040;
+}
+
+.submenu-header h2 {
+    color: #ececec;
+    margin: 0;
+    font-size: 24px;
+}
+
+.submenu-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.submodule-card {
+    background-color: #2a2a2a;
+    border: 1px solid #404040;
+    border-radius: 8px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.submodule-card:hover {
+    background-color: #333;
+    border-color: #28a745;
+    transform: translateY(-1px);
+}
+
+.submodule-icon {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 48px;
+    height: 48px;
+    background-color: #28a745;
+    border-radius: 8px;
+    color: white;
+    flex-shrink: 0;
+}
+
+.submodule-card h4 {
+    color: #ececec;
+    margin: 0 0 4px 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.submodule-card p {
+    color: #aaa;
+    font-size: 13px;
+    margin: 0;
+    line-height: 1.4;
+}
+
+/* Формы модулей */
+.module-form {
+    padding: 20px 0;
+}
+
+.form-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #404040;
+}
+
+.form-header h2 {
+    color: #ececec;
+    margin: 0;
+    font-size: 24px;
+}
+
+.form-content {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.format-info code {
+    background-color: #333;
+    color: #17a2b8;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+}
+
+.format-info p {
+    margin: 8px 0 4px 0;
+    color: #ccc;
+    font-size: 13px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+}
+
+/* Статус выполнения */
+.execution-status {
+    margin-top: 24px;
+}
+
+.status-info {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.status-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background-color: #333;
+    border-radius: 6px;
+}
+
+.status-label {
+    color: #aaa;
+    font-size: 14px;
+}
+
+.status-value {
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.status-value.running {
+    color: #17a2b8;
+}
+
+.status-value.success {
+    color: #28a745;
+}
+
+.status-value.error {
+    color: #dc3545;
+}
+
+.execution-logs {
+    max-height: 300px;
+    overflow-y: auto;
+    background-color: #1a1a1a;
+    border-radius: 6px;
+    padding: 16px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+}
+
+.log-entry {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 8px;
+    padding: 4px 0;
+    border-bottom: 1px solid #333;
+}
+
+.log-entry:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.log-timestamp {
+    color: #6c757d;
+    font-size: 12px;
+    min-width: 80px;
+    flex-shrink: 0;
+}
+
+.log-message {
+    color: #ececec;
+    flex: 1;
+    word-break: break-word;
+}
+
+/* Дополнительные стили для уведомлений */
+.notification-info {
+    border-left: 4px solid #17a2b8;
+}
+
+/* Адаптивность для модулей */
+@media (max-width: 768px) {
+    .modules-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    
+    .submenu-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    
+    .submodule-card {
+        flex-direction: column;
+        text-align: center;
+        gap: 12px;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .status-info {
+        gap: 8px;
+    }
+    
+    .status-item {
+        flex-direction: column;
+        gap: 4px;
+        text-align: center;
+    }
+}
+
+/* Стили для табов результатов */
+.results-tabs {
+    margin-top: 20px;
+}
+
+.tab-header {
+    display: flex;
+    border-bottom: 2px solid #333;
+    margin-bottom: 15px;
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    padding: 12px 20px;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.tab-btn:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.tab-btn.active {
+    color: #10a37f;
+    border-bottom-color: #10a37f;
+}
+
+.tab-content {
+    position: relative;
+}
+
+.tab-pane {
+    display: none;
+}
+
+.tab-pane.active {
+    display: block;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #666;
+    font-style: italic;
+}

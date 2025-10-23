@@ -1,0 +1,392 @@
+# Промт для продолжения разработки веб-интерфейса Crypto Playground
+
+## Описание проекта
+Продолжить разработку веб-интерфейса для управления проектом crypto-playground. Существующий проект находится в `/workspace/crypto-playground-web/` и использует Flask + Python для backend и HTML/CSS/JavaScript для frontend.
+
+## Текущая структура проекта
+```
+/workspace/crypto-playground-web/
+├── app.py                 # Flask приложение (основной файл)
+├── templates/             # HTML шаблоны
+│   ├── base.html         # Базовый шаблон
+│   ├── index.html        # Главная страница
+│   ├── accounts.html     # Страница аккаунтов
+│   ├── modules.html      # Страница модулей
+│   └── logs.html         # Страница логов
+├── static/               # Статические файлы
+│   ├── css/             # CSS стили
+│   ├── js/              # JavaScript файлы
+│   └── images/          # Изображения
+└── requirements.txt      # Python зависимости
+```
+
+## Связанные проекты
+- `/workspace/crypto-playground/` - основной проект с модулями автоматизации
+- `/workspace/proxytest/` - тестер прокси серверов (нужно интегрировать)
+
+## ЗАДАЧА 1: Вкладка "Proxies"
+
+### Функциональные требования:
+
+#### 1.1 Интерфейс вкладки Proxies
+- Создать новую вкладку "Proxies" в навигации
+- Добавить маршрут `/proxies` в Flask приложение
+- Создать шаблон `templates/proxies.html`
+
+#### 1.2 Основные компоненты интерфейса:
+1. **Область ввода прокси**:
+   - Большое текстовое поле (textarea) для вставки списка прокси
+   - Поддержка различных форматов прокси:
+     - `domain:port:username:password`
+     - `username:password@domain:port`
+     - `http://username:password@domain:port`
+   - Кнопка "Тестировать прокси"
+
+2. **Область результатов тестирования**:
+   - Прогресс-бар тестирования
+   - Статистика в реальном времени:
+     - Всего прокси: X
+     - Протестировано: X/Y
+     - Рабочих: X
+     - Уникальных IP: X
+   - Список первых 10 рабочих прокси с уникальными IP
+   - Возможность прокрутки для просмотра всех результатов
+
+3. **Кнопки управления**:
+   - **"Copy"** - копирование списка рабочих прокси в буфер обмена
+   - **"Выгрузить.tsv"** - сохранение в файл `workspace/crypto-playground/files/proxies/proxies{дата}.tsv`
+   - **"Загрузить в БД"** - запуск команды синхронизации с базой данных
+
+#### 1.3 Интеграция с тестером прокси:
+- Использовать код из `/workspace/proxytest/proxy_tester.py`
+- Адаптировать класс `ProxyTester` для работы через веб-интерфейс
+- Реализовать WebSocket для передачи прогресса тестирования в реальном времени
+
+#### 1.4 API endpoints для вкладки Proxies:
+```python
+@app.route('/api/proxies/test', methods=['POST'])
+def api_test_proxies():
+    """Запуск тестирования прокси"""
+    # Получить список прокси из request.json
+    # Запустить тестирование в отдельном потоке
+    # Возвращать progress через WebSocket
+    pass
+
+@app.route('/api/proxies/results')
+def api_proxies_results():
+    """Получение результатов тестирования"""
+    pass
+
+@app.route('/api/proxies/export', methods=['POST'])
+def api_export_proxies():
+    """Экспорт прокси в TSV файл"""
+    # Формат файла: ip:port:login:password
+    # Путь: workspace/crypto-playground/files/proxies/proxies{дата}.tsv
+    pass
+
+@app.route('/api/proxies/sync', methods=['POST'])
+def api_sync_proxies():
+    """Синхронизация прокси с БД"""
+    # Запуск команды: python supply/sync_proxies_v2.py -f files/proxies/proxies{дата}.tsv --sync
+    pass
+```
+
+#### 1.5 WebSocket события:
+```javascript
+// События для real-time обновлений
+socket.on('proxy_test_progress', function(data) {
+    // data: { tested: 50, total: 100, working: 25, unique: 20 }
+});
+
+socket.on('proxy_test_complete', function(data) {
+    // data: { working_proxies: [...], unique_proxies: [...] }
+});
+```
+
+## ЗАДАЧА 2: Вкладка "Modules"
+
+### Функциональные требования:
+
+#### 2.1 Главная страница модулей
+- Отображение списка доступных модулей в виде кнопок:
+  - Telegram
+  - 2Gis
+  - Discord
+  - X (Twitter)
+  - VK
+
+#### 2.2 Модуль 2Gis
+При нажатии на кнопку "2Gis" показать подмодули:
+- **"2gis comment"** - для создания комментариев
+- **"2gis pars"** - для парсинга данных
+
+#### 2.3 Подмодуль "2gis comment"
+При выборе "2gis comment":
+
+1. **Интерфейс ввода данных**:
+   - Текстовое поле для ввода данных в формате:
+     ```
+     ID	название адрес	комментарий
+     ```
+   - Пример данных:
+     ```
+     0x13f15E0bD64dB813111B88D4ec16F2c321824589	Зоосфера, улица 70 лет Октября, 29, Омск	Покупала корм для кошки, выбор широкий, продавцы знают продукцию, помогают с выбором.
+     ```
+
+2. **Сохранение данных**:
+   - Данные сохраняются в файл: `workspace/crypto-playground/files/acc_2gis_comment.tsv`
+   - Формат: табуляция между полями
+
+3. **Кнопка запуска**:
+   - **"Запустить 2Gis"** - запускает команду:
+     ```bash
+     python batyacorp_main.py -a ./files/acc_2gis_comment.tsv -p batyacorp -m 2gis.comment -e --proxy
+     ```
+
+#### 2.4 API endpoints для модулей:
+```python
+@app.route('/api/modules/2gis/comment/save', methods=['POST'])
+def api_save_2gis_comment_data():
+    """Сохранение данных для 2gis comment"""
+    # Сохранить данные в files/acc_2gis_comment.tsv
+    pass
+
+@app.route('/api/modules/2gis/comment/run', methods=['POST'])
+def api_run_2gis_comment():
+    """Запуск модуля 2gis comment"""
+    # Запуск команды через ProcessManager
+    pass
+
+@app.route('/api/modules/list')
+def api_modules_list():
+    """Получение списка всех модулей"""
+    pass
+```
+
+## Технические требования
+
+### 2.1 Frontend технологии:
+- HTML5, CSS3, JavaScript (ES6+)
+- Bootstrap 5 или аналогичный CSS framework для UI
+- WebSocket для real-time обновлений
+- Fetch API для AJAX запросов
+
+### 2.2 Backend технологии:
+- Flask (текущий)
+- Flask-SocketIO для WebSocket
+- Threading для фоновых задач
+- Subprocess для запуска команд crypto-playground
+
+### 2.3 Структура файлов:
+```
+/workspace/crypto-playground-web/
+├── app.py                    # Основное Flask приложение
+├── templates/
+│   ├── base.html            # Базовый шаблон с навигацией
+│   ├── index.html           # Главная страница
+│   ├── proxies.html         # Новая вкладка прокси
+│   ├── modules.html         # Обновленная вкладка модулей
+│   └── ...
+├── static/
+│   ├── css/
+│   │   ├── main.css         # Основные стили
+│   │   └── proxies.css      # Стили для вкладки прокси
+│   ├── js/
+│   │   ├── main.js          # Основной JavaScript
+│   │   ├── proxies.js       # JavaScript для прокси
+│   │   ├── modules.js       # JavaScript для модулей
+│   │   └── websocket.js     # WebSocket клиент
+│   └── images/
+└── utils/
+    ├── proxy_tester.py      # Адаптированный тестер прокси
+    └── process_manager.py   # Менеджер процессов (уже есть в app.py)
+```
+
+## Дизайн и UX
+
+### 3.1 Цветовая схема:
+- Темная тема (основная)
+- Акцентные цвета: синий (#007bff), зеленый (#28a745), красный (#dc3545)
+- Фон: #212529
+- Текст: #ffffff, #f8f9fa
+
+### 3.2 Компоненты интерфейса:
+- Боковая навигация с иконками
+- Карточки для группировки функций
+- Прогресс-бары для длительных операций
+- Модальные окна для подтверждений
+- Уведомления (toast) для обратной связи
+
+### 3.3 Адаптивность:
+- Responsive дизайн для desktop и tablet
+- Мобильная версия (упрощенная)
+
+## Интеграция с существующими компонентами
+
+### 4.1 Использование ProcessManager:
+- Расширить существующий класс `ProcessManager` в `app.py`
+- Добавить методы для работы с тестером прокси
+- Реализовать очередь задач для последовательного выполнения
+
+### 4.2 WebSocket интеграция:
+- Использовать существующий SocketIO
+- Добавить новые события для прокси и модулей
+- Реализовать комнаты для изоляции событий
+
+### 4.3 Файловая система:
+- Создать необходимые директории:
+  - `/workspace/crypto-playground/files/proxies/`
+  - `/workspace/crypto-playground/files/` (для TSV файлов модулей)
+
+## Безопасность
+
+### 5.1 Валидация данных:
+- Проверка форматов прокси
+- Санитизация пользовательского ввода
+- Ограничение размера загружаемых данных
+
+### 5.2 Выполнение команд:
+- Белый список разрешенных команд
+- Экранирование параметров командной строки
+- Ограничение прав доступа к файловой системе
+
+## Логирование и мониторинг
+
+### 6.1 Логирование:
+- Логи тестирования прокси
+- Логи выполнения модулей
+- Ошибки и исключения
+
+### 6.2 Мониторинг:
+- Статус выполняемых процессов
+- Использование ресурсов
+- Время выполнения операций
+
+## Порядок реализации
+
+### Этап 1: Вкладка Proxies
+1. Создать маршрут и шаблон для `/proxies`
+2. Интегрировать тестер прокси из `/workspace/proxytest/`
+3. Реализовать API endpoints для тестирования
+4. Добавить WebSocket события для прогресса
+5. Реализовать экспорт в TSV и синхронизацию с БД
+
+### Этап 2: Обновление вкладки Modules
+1. Обновить интерфейс модулей
+2. Добавить подмодули для 2Gis
+3. Реализовать форму для 2gis comment
+4. Добавить сохранение данных в TSV
+5. Реализовать запуск команд через ProcessManager
+
+### Этап 3: Тестирование и оптимизация
+1. Тестирование всех функций
+2. Оптимизация производительности
+3. Улучшение UX/UI
+4. Документация
+
+## Примеры кода
+
+### Пример структуры proxies.html:
+```html
+{% extends "base.html" %}
+{% block title %}Proxies - Crypto Playground{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Тестирование прокси</h5>
+                </div>
+                <div class="card-body">
+                    <textarea id="proxyInput" class="form-control" rows="10" 
+                              placeholder="Вставьте список прокси..."></textarea>
+                    <button id="testProxies" class="btn btn-primary mt-3">
+                        Тестировать прокси
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Результаты</h5>
+                </div>
+                <div class="card-body">
+                    <div id="progress" class="mb-3"></div>
+                    <div id="stats" class="mb-3"></div>
+                    <div id="results"></div>
+                    <div class="mt-3">
+                        <button id="copyResults" class="btn btn-secondary">Copy</button>
+                        <button id="exportTsv" class="btn btn-info">Выгрузить.tsv</button>
+                        <button id="syncDb" class="btn btn-success">Загрузить в БД</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+```
+
+### Пример JavaScript для прокси:
+```javascript
+// proxies.js
+class ProxyTester {
+    constructor() {
+        this.socket = io();
+        this.setupEventListeners();
+        this.setupSocketListeners();
+    }
+    
+    setupEventListeners() {
+        document.getElementById('testProxies').addEventListener('click', () => {
+            this.startTesting();
+        });
+        
+        document.getElementById('copyResults').addEventListener('click', () => {
+            this.copyToClipboard();
+        });
+        
+        document.getElementById('exportTsv').addEventListener('click', () => {
+            this.exportToTsv();
+        });
+        
+        document.getElementById('syncDb').addEventListener('click', () => {
+            this.syncToDatabase();
+        });
+    }
+    
+    setupSocketListeners() {
+        this.socket.on('proxy_test_progress', (data) => {
+            this.updateProgress(data);
+        });
+        
+        this.socket.on('proxy_test_complete', (data) => {
+            this.showResults(data);
+        });
+    }
+    
+    startTesting() {
+        const proxies = document.getElementById('proxyInput').value;
+        fetch('/api/proxies/test', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({proxies: proxies})
+        });
+    }
+    
+    // ... остальные методы
+}
+
+new ProxyTester();
+```
+
+## Заключение
+
+Данный промт содержит подробные требования для продолжения разработки веб-интерфейса crypto-playground. Основной фокус на:
+
+1. **Вкладка Proxies** - полнофункциональный тестер прокси с интеграцией существующего кода
+2. **Вкладка Modules** - улучшенный интерфейс для работы с модулями, особенно 2Gis
+
+Реализация должна быть выполнена поэтапно с тщательным тестированием каждого компонента.
