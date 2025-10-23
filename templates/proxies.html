@@ -22,7 +22,7 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    <textarea id="proxyInput" class="form-control" rows="12" 
+                    <textarea id="proxyInput" class="form-control" rows="10"
                               placeholder="Вставьте список прокси серверов...&#10;Пример:&#10;proxy1.example.com:8080:user1:pass1&#10;user2:pass2@proxy2.example.com:3128&#10;http://user3:pass3@proxy3.example.com:1080"></textarea>
                     <div class="input-actions">
                         <button id="testProxies" class="btn btn-primary">
@@ -82,16 +82,15 @@
 
                     <div class="results-section" style="display: none;">
                         <div class="results-header">
-                            <h4>Результаты тестирования</h4>
                             <div class="results-actions">
-                                <button id="copyResults" class="btn btn-secondary">
+                                <button id="copyResults" class="btn btn-secondary" type="button">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                                         <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                                     </svg>
                                     Copy
                                 </button>
-                                <button id="exportTsv" class="btn btn-info">
+                                <button id="exportTsv" class="btn btn-info" type="button">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                                         <polyline points="7,10 12,15 17,10"/>
@@ -99,7 +98,7 @@
                                     </svg>
                                     Выгрузить.tsv
                                 </button>
-                                <button id="syncDb" class="btn btn-success" style="display: none;">
+                                <button id="syncDb" class="btn btn-success" type="button" style="display: none;">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
                                     </svg>

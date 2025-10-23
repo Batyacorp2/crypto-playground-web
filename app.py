@@ -295,6 +295,7 @@ original_formats = {}
 # Глобальные переменные для хранения результатов
 current_working_proxies = []
 current_unique_proxies = []
+last_exported_filename = None
 
 def parse_proxy_format(proxy_string):
     """
@@ -372,20 +373,23 @@ def test_single_proxy(proxy, timeout=10):
 
 def run_proxy_test(proxy_list):
     """Запускает тестирование прокси в отдельном потоке с многопоточностью"""
-    global testing_progress, stop_testing, original_formats, current_working_proxies, current_unique_proxies
-    
+    global testing_progress, stop_testing, original_formats, current_working_proxies, current_unique_proxies, last_exported_filename
+
     print(f"Starting proxy testing with {len(proxy_list)} proxies")
-    
+
     testing_progress['is_running'] = True
     testing_progress['current'] = 0
     testing_progress['working'] = 0
     testing_progress['failed'] = 0
     testing_progress['unique_ips'] = 0
     stop_testing = False
-    
+    last_exported_filename = None
+
     # Парсим прокси в разных форматах
     proxies = []
     original_formats.clear()  # Очищаем предыдущие данные
+    current_working_proxies = []
+    current_unique_proxies = []
     for raw_proxy in proxy_list:
         standard_format, original_format = parse_proxy_format(raw_proxy)
         proxies.append(standard_format)
@@ -1024,6 +1028,17 @@ def api_proxies_progress():
     """API для получения прогресса тестирования"""
     return jsonify(testing_progress)
 
+@app.route('/api/proxies/state')
+def api_proxies_state():
+    """Сводное состояние страницы прокси"""
+    return jsonify({
+        'progress': dict(testing_progress),
+        'is_running': testing_progress.get('is_running', False),
+        'working': list(current_working_proxies),
+        'unique': list(current_unique_proxies),
+        'exported_filename': last_exported_filename,
+    })
+
 @app.route('/api/proxies/working')
 def api_proxies_working():
     """API для получения рабочих прокси"""
@@ -1039,49 +1054,70 @@ def api_proxies_unique():
 @app.route('/api/proxies/export', methods=['POST'])
 def api_export_proxies():
     """API для экспорта прокси в TSV файл"""
+    global last_exported_filename
     try:
         # Создаем директорию если не существует
         proxies_dir = os.path.join(CRYPTO_PLAYGROUND_PATH, 'files', 'proxies')
         os.makedirs(proxies_dir, exist_ok=True)
-        
+
         # Генерируем имя файла с текущей датой
         current_date = datetime.now().strftime('%d.%m.%y')
         filename = f'proxies{current_date}.tsv'
         file_path = os.path.join(proxies_dir, filename)
-        
+        relative_path = os.path.join('files', 'proxies', filename)
+
         # Сохраняем уникальные прокси в оригинальном формате
         with open(file_path, 'w', encoding='utf-8') as f:
             for proxy in current_unique_proxies:
                 original_format = original_formats.get(proxy, proxy)
                 f.write(original_format + '\n')
-        
+
+        last_exported_filename = filename
+
+        display_command = (
+            f"python supply\\sync_proxies_v2.py -f files\\proxies\\{filename}"
+        )
+
         return jsonify({
             'success': True,
             'filename': filename,
             'path': file_path,
-            'count': len(current_unique_proxies)
+            'relative_path': relative_path,
+            'count': len(current_unique_proxies),
+            'display_command': display_command
         })
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/proxies/sync', methods=['POST'])
 def api_sync_proxies():
     """API для синхронизации прокси с БД"""
+    global last_exported_filename
     try:
         data = request.json
-        filename = data.get('filename')
-        
+        filename = data.get('filename') if data else None
+
+        if not filename:
+            filename = last_exported_filename
+
         if not filename:
             return jsonify({'error': 'Имя файла не указано'}), 400
-        
+
+        filename = os.path.basename(filename)
+        relative_path = os.path.join('files', 'proxies', filename)
+        absolute_path = os.path.join(PROXIES_DIR, filename)
+
+        if not os.path.exists(absolute_path):
+            return jsonify({'error': 'Файл не найден для синхронизации'}), 404
+
         # Формируем команду синхронизации
-        file_path = f'files/proxies/{filename}'
-        command = f'python supply/sync_proxies_v2.py -f {file_path} --sync'
-        
+        script_path = os.path.join('supply', 'sync_proxies_v2.py')
+        command = f'python "{script_path}" -f "{relative_path}"'
+
         # Генерируем ID команды
         command_id = f"proxy_sync_{int(time.time())}"
-        
+
         # Запускаем процесс
         result = process_manager.start_process(command_id, command)
         
@@ -1089,7 +1125,8 @@ def api_sync_proxies():
             return jsonify({
                 'success': True,
                 'command_id': command_id,
-                'command': command
+                'command': command,
+                'display_command': f"python supply\\sync_proxies_v2.py -f files\\proxies\\{filename}"
             })
         elif isinstance(result, tuple):
             success, error = result
@@ -1097,7 +1134,8 @@ def api_sync_proxies():
                 return jsonify({
                     'success': True,
                     'command_id': command_id,
-                    'command': command
+                    'command': command,
+                    'display_command': f"python supply\\sync_proxies_v2.py -f files\\proxies\\{filename}"
                 })
             else:
                 return jsonify({'error': error}), 500
