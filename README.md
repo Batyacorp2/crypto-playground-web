@@ -228,4 +228,4 @@ logging.basicConfig(filename='web.log', level=logging.INFO)
 
 ---
 
-**Crypto Playground Web Interface** - современный и удобный способ управления автоматизацией криптовалютных операций! 🚀
+**Crypto Playground Web Interface** - современный и удобный способ управления автоматизацией криптовалютных операций! 🚀# Repository successfully migrated to main branch
