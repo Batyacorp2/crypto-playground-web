@@ -77,7 +77,8 @@
 
     <!-- Socket.IO -->
     <!-- Socket.IO убран - используем HTTP polling -->
-    
-    <!-- JavaScript для создания кнопки показа панели удален - теперь используется клик по логотипу -->
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block extra_scripts %}{% endblock %}
 </body>
 </html>
